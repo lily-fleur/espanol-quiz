@@ -215,12 +215,31 @@ function globalQuizKeyHandler(e) {
 }
 
 // ── 音声読み上げ ──────────────────────────────────────────────
+// 端末によってはlang指定だけでは無視され、システムのデフォルト言語（日本語など）の声で
+// 読み上げられてしまうため、利用可能な音声一覧からスペイン語の声を明示的に探して指定する。
+// 音声一覧は非同期に読み込まれる場合があるためキャッシュしてvoiceschangedで更新する。
+let cachedVoices = [];
+if (window.speechSynthesis) {
+  const loadVoices = () => { cachedVoices = window.speechSynthesis.getVoices(); };
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function pickSpanishVoice() {
+  if (!cachedVoices.length) cachedVoices = window.speechSynthesis.getVoices();
+  return cachedVoices.find(v => v.lang === "es-ES")
+      || cachedVoices.find(v => v.lang && v.lang.toLowerCase().startsWith("es"))
+      || null;
+}
+
 function speakSpanish(text) {
   if (!state.soundOn) return;
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "es-ES";
+  const voice = pickSpanishVoice();
+  if (voice) utter.voice = voice;
   utter.rate = 0.9;
   utter.pitch = 1;
   window.speechSynthesis.speak(utter);
