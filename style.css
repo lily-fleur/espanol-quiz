@@ -1436,3 +1436,21 @@ main { padding: 8px 16px 40px; }
   flex: 1;
   text-align: left;
 }
+
+/* ═══ バックアップ ═══ */
+.backup-desc {
+  font-size: 11px;
+  color: #8a939e;
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+.backup-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.backup-btns .save-btn,
+.backup-btns .cancel-btn {
+  width: 100%;
+  display: block;
+}

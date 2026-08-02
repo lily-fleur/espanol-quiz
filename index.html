@@ -135,6 +135,21 @@
           <p>A列：スペイン語　B列：日本語　C列：カテゴリ</p>
           <p>1行目はヘッダー行として無視されます</p>
         </div>
+
+        <!-- バックアップ -->
+        <div class="sheets-card">
+          <div class="sheets-title">💾 学習データのバックアップ</div>
+          <p class="backup-desc">
+            単語・SRSレベル・成績・連続学習日数をまとめて保存します。<br>
+            同じファイル名で保存すれば常に上書きされます。
+          </p>
+          <div class="backup-btns">
+            <button id="backup-export-btn" class="save-btn">⬇️ バックアップを保存</button>
+            <button id="backup-import-btn" class="cancel-btn">⬆️ バックアップから復元</button>
+          </div>
+          <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none" />
+          <div id="backup-status" class="sheets-status" style="display:none"></div>
+        </div>
       </div>
 
       <!-- 成績タブ -->

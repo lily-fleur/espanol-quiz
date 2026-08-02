@@ -95,6 +95,114 @@ function saveData() {
 }
 
 
+// ── バックアップ（書き出し / 復元）────────────────────────────
+function buildBackupObject() {
+  // 現在編集中の単語を実体に同期してから書き出す
+  if (state.source === "my") state._myWords   = state.words;
+  else                       state._deleWords = state.words;
+  return {
+    app: "EspanolQuiz",
+    version: 1,
+    savedAt: new Date().toISOString(),
+    data: {
+      words:       state._myWords ?? [],
+      wordsDele:   state._deleWords ?? [],
+      source:      state.source,
+      sessionSize: state.sessionSize,
+      cycle:       state.cycle ?? {},
+      soundOn:     state.soundOn,
+      study:       state.study ?? { lastDate: null, streak: 0 },
+      stats:       state.stats ?? {},
+      srs:         state.srs ?? {},
+    },
+  };
+}
+
+function setBackupStatus(type, msg) {
+  const el = document.getElementById("backup-status");
+  if (!el) return;
+  el.style.display = "block";
+  el.className = "sheets-status " + type;
+  el.textContent = msg;
+}
+
+async function exportBackup() {
+  try {
+    const obj  = buildBackupObject();
+    const json = JSON.stringify(obj, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    // 固定ファイル名：同じ名前で保存すれば上書きされる
+    const filename = "espanolquiz-backup.json";
+    const file = new File([blob], filename, { type: "application/json" });
+
+    // iOSは共有シート経由が最も確実
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "EspañolQuiz バックアップ" });
+      setBackupStatus("success", "✓ バックアップを書き出しました");
+      return;
+    }
+    // フォールバック：通常ダウンロード
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setBackupStatus("success", "✓ バックアップを書き出しました");
+  } catch (e) {
+    if (e && e.name === "AbortError") return; // 共有シートをキャンセル
+    setBackupStatus("error", "書き出しに失敗しました");
+  }
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(reader.result);
+      const d = obj && obj.data ? obj.data : obj; // 旧形式も一応許容
+      if (!d || (!d.words && !d.wordsDele)) {
+        setBackupStatus("error", "バックアップの形式が違うようです");
+        return;
+      }
+      const myCount   = (d.words ?? []).length;
+      const deleCount = (d.wordsDele ?? []).length;
+      const when = obj.savedAt ? new Date(obj.savedAt).toLocaleString("ja-JP") : "不明";
+      if (!confirm(`このバックアップで現在のデータを置き換えます。\n\n保存日時：${when}\nマイ単語：${myCount}語 / DELE：${deleCount}語\n\nよろしいですか？`)) return;
+
+      state._myWords    = d.words ?? [];
+      state._deleWords  = d.wordsDele ?? [];
+      state.source      = d.source ?? "my";
+      state.sessionSize = d.sessionSize ?? 20;
+      state.cycle       = d.cycle ?? {};
+      state.soundOn     = d.soundOn ?? true;
+      state.study       = d.study ?? { lastDate: null, streak: 0 };
+      state.stats       = d.stats ?? {};
+      state.srs         = d.srs ?? {};
+      state.words       = state.source === "my" ? state._myWords : state._deleWords;
+      state.quizFilter  = "全て";
+      state.quizLevel   = "全て";
+      state.quizPos     = "全て";
+
+      saveData();
+      updateWordCount();
+      updateSourceButtons();
+      updateStudyStreakDisplay();
+      startQuiz();
+      renderQuiz();
+      renderWords();
+      renderStats();
+      setBackupStatus("success", `✓ 復元しました（マイ単語 ${myCount}語 / DELE ${deleCount}語）`);
+    } catch (_) {
+      setBackupStatus("error", "ファイルを読み込めませんでした");
+    }
+  };
+  reader.onerror = () => setBackupStatus("error", "ファイルを読み込めませんでした");
+  reader.readAsText(file);
+}
+
 // ── アクセント正規化 ──────────────────────────────────────────
 function normalizeText(str) {
   return str.trim().toLowerCase()
@@ -1319,6 +1427,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // スプシ読み込みボタン
   document.getElementById("sheets-import-btn").addEventListener("click", importFromSheetsCsv);
+
+  // バックアップ
+  const exportBtn = document.getElementById("backup-export-btn");
+  const importBtn = document.getElementById("backup-import-btn");
+  const fileInput = document.getElementById("backup-file-input");
+  if (exportBtn) exportBtn.addEventListener("click", exportBackup);
+  if (importBtn && fileInput) {
+    importBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) importBackup(f);
+      e.target.value = ""; // 同じファイルを再選択できるように
+    });
+  }
 
   switchTab("quiz");
 });
