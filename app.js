@@ -606,7 +606,6 @@ function renderQuiz() {
       filterLabel = quizFilter;
     }
     if (state.quizPos !== "全て") filterLabel += `・${state.quizPos}`;
-    if (state.quizPos !== "全て") filterLabel += `・${state.quizPos}`;
     const parts = quizMode === "example"
       ? [modeLabel, sizeLabel, filterLabel]
       : [dirLabel, modeLabel, sizeLabel, filterLabel];
@@ -618,52 +617,73 @@ function renderQuiz() {
   // フィルターUI（ソース別）
   const filterWrap = document.getElementById("quiz-filters");
   if (state.source === "dele") {
-    // DELE：レベルボタン＋ジャンルプルダウン
+    // DELE：レベル（少数ならボタン／多数ならプルダウン）＋ジャンル＋品詞
     const levels = ["全て", ...Array.from(new Set(words.map(w => w.category))).sort()];
+    if (!levels.includes(state.quizLevel)) state.quizLevel = "全て";
     const levelPool = state.quizLevel === "全て" ? words : words.filter(w => w.category === state.quizLevel);
-    const genres = ["全て", ...Array.from(new Set(levelPool.map(w => w.genre).filter(Boolean)))];
+    const genreList = Array.from(new Set(levelPool.map(w => w.genre).filter(Boolean)));
+    const genres = ["全て", ...genreList];
 
-    const levelHtml = levels.map(l => {
-      const count = l === "全て" ? words.length : words.filter(w => w.category === l).length;
-      return `<button class="cat-btn${l === state.quizLevel ? " active" : ""}" data-level="${l}">${l} <span class="cat-count">${count}</span></button>`;
-    }).join("");
+    const levelCount = l => l === "全て" ? words.length : words.filter(w => w.category === l).length;
 
-    const genreOptions = genres.map(g => {
-      const count = g === "全て" ? levelPool.length : levelPool.filter(w => w.genre === g).length;
-      return `<option value="${g}"${g === quizFilter ? " selected" : ""}>${g}（${count}語）</option>`;
-    }).join("");
+    // 5個以上（A1/A2以外の運用）ならボタンではなくプルダウンにして崩れを防ぐ
+    const useLevelSelect = levels.length > 5;
+    const levelHtml = useLevelSelect
+      ? `<select id="level-select" class="genre-select">${levels.map(l =>
+          `<option value="${l}"${l === state.quizLevel ? " selected" : ""}>${l === "全て" ? "カテゴリ: 全て" : l}（${levelCount(l)}語）</option>`
+        ).join("")}</select>`
+      : `<div class="level-row">${levels.map(l =>
+          `<button class="cat-btn${l === state.quizLevel ? " active" : ""}" data-level="${l}">${l} <span class="cat-count">${levelCount(l)}</span></button>`
+        ).join("")}</div>`;
+
+    // ジャンル列（G列）がないデータではジャンル選択を出さない
+    const genreHtml = genreList.length > 0
+      ? `<select id="genre-select" class="genre-select">${genres.map(g => {
+          const count = g === "全て" ? levelPool.length : levelPool.filter(w => w.genre === g).length;
+          return `<option value="${g}"${g === quizFilter ? " selected" : ""}>${g === "全て" ? "ジャンル: 全て" : g}（${count}語）</option>`;
+        }).join("")}</select>`
+      : "";
+    if (genreList.length === 0) state.quizFilter = "全て";
 
     // 品詞プルダウン
     const posPool = state.quizFilter === "全て" ? levelPool : levelPool.filter(w => w.genre === state.quizFilter);
     const posList = ["全て", ...Array.from(new Set(posPool.map(w => w.pos).filter(Boolean)))];
-    const posOptions = posList.map(p => {
-      const count = p === "全て" ? posPool.length : posPool.filter(w => w.pos === p).length;
-      return `<option value="${p}"${p === state.quizPos ? " selected" : ""}>${p === "全て" ? "品詞: 全て" : p}（${count}語）</option>`;
-    }).join("");
+    if (!posList.includes(state.quizPos)) state.quizPos = "全て";
+    const posHtml = posList.length > 1
+      ? `<select id="pos-select" class="genre-select">${posList.map(p => {
+          const count = p === "全て" ? posPool.length : posPool.filter(w => w.pos === p).length;
+          return `<option value="${p}"${p === state.quizPos ? " selected" : ""}>${p === "全て" ? "品詞: 全て" : p}（${count}語）</option>`;
+        }).join("")}</select>`
+      : "";
 
-    filterWrap.innerHTML = `
-      <div class="level-row">${levelHtml}</div>
-      <div class="select-row">
-        <select id="genre-select" class="genre-select">${genreOptions}</select>
-        <select id="pos-select" class="genre-select">${posOptions}</select>
-      </div>`;
+    const selectRow = (genreHtml || posHtml)
+      ? `<div class="select-row">${genreHtml}${posHtml}</div>` : "";
+    filterWrap.innerHTML = levelHtml + selectRow;
 
-    filterWrap.querySelectorAll("[data-level]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        state.quizLevel = btn.dataset.level;
-        state.quizFilter = "全て"; // レベル変更時はジャンルをリセット
-        state.quizPos = "全て";
-        startQuiz();
-        renderQuiz();
+    const onLevelChange = (val) => {
+      state.quizLevel = val;
+      state.quizFilter = "全て"; // レベル変更時はジャンル・品詞をリセット
+      state.quizPos = "全て";
+      startQuiz();
+      renderQuiz();
+    };
+    const levelSelectEl = document.getElementById("level-select");
+    if (levelSelectEl) {
+      levelSelectEl.addEventListener("change", e => onLevelChange(e.target.value));
+    } else {
+      filterWrap.querySelectorAll("[data-level]").forEach(btn => {
+        btn.addEventListener("click", () => onLevelChange(btn.dataset.level));
       });
-    });
-    document.getElementById("genre-select").addEventListener("change", (e) => {
+    }
+    const genreEl = document.getElementById("genre-select");
+    if (genreEl) genreEl.addEventListener("change", (e) => {
       state.quizFilter = e.target.value;
       state.quizPos = "全て";
       startQuiz();
       renderQuiz();
     });
-    document.getElementById("pos-select").addEventListener("change", (e) => {
+    const posEl = document.getElementById("pos-select");
+    if (posEl) posEl.addEventListener("change", (e) => {
       state.quizPos = e.target.value;
       startQuiz();
       renderQuiz();
