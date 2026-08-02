@@ -1417,3 +1417,22 @@ main { padding: 8px 16px 40px; }
   padding: 1px 7px;
   font-size: 10px;
 }
+/* ═══ フィルターのはみ出し防止 ═══ */
+#quiz-filters { width: 100%; }
+#quiz-filters .genre-select {
+  width: 100%;
+  margin-bottom: 6px;
+  text-overflow: ellipsis;
+}
+.select-row { flex-wrap: wrap; }
+.select-row .genre-select { flex: 1 1 140px; }
+.level-row { flex-wrap: wrap; }
+.level-row .cat-btn { flex: 1 1 auto; min-width: 0; }
+.settings-toggle #settings-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
